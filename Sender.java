@@ -7,14 +7,8 @@ enum event_type {
 }
 
 public class Sender {
-    /*
-     * public enum event_type {
-     * frame_arrival, cksum_err, timeout, network_layer_ready, NULL
-     * }
-     */
-
     private class Packet {
-        char[] data = new char[MAX_PKT];
+        char data;
     }
 
     enum frame_kind {
@@ -29,8 +23,8 @@ public class Sender {
     }
 
     // packer buffer of network layer // and buffer index
-    private static final Packet[] network_buffer = new Packet[20];
-    private static int network_index = 19;
+    private static final Packet[] network_buffer = new Packet[7];
+    private static int network_index = 6;
     // list of threads
     // private static List<Thread> thr_list =new ArrayList<Thread>();
     private static Thread[] thr_arr = new Thread[100];
@@ -38,8 +32,17 @@ public class Sender {
     private static final int MAX_SEQ = 7;
     private static final int MAX_PKT = 4;
     public static event_type event = event_type.NULL;
+    private static Packet p;
+
 
     public static void main(String[] args) throws IOException, ClassNotFoundException {
+        char[] alpha = {'A', 'B', 'C', 'D', 'E', 'F', 'G'};
+        for(int j = 0; j < 7; j++)
+        {
+            p.data = alpha[j];
+            network_buffer[j] = p;
+        }
+    
         Socket s = new Socket("127.0.0.1", 1234);
         String recieved_respond = null;
         boolean close_connection = false;
@@ -66,9 +69,9 @@ public class Sender {
             switch (event) {
                 case network_layer_ready: /* the network layer has a packet to send */
                     /* Accept, save, and transmit a new frame. */
-                    buffer[next_frame_to_send] = from_network_layer(); /* fetch new packet */
+                    buffer[next_frame_to_send] = from_network_layer(data_out_s); /* fetch new packet */
                     nbuffered = nbuffered + 1; /* expand the sender's window */
-                    send_data(next_frame_to_send, frame_expected, buffer, obj_out_s); /* transmit the frame */
+                    send_data(next_frame_to_send, frame_expected, buffer, obj_out_s, data_out_s); /* transmit the frame */
                     next_frame_to_send = inc(next_frame_to_send); /* advance sender's upper window edge */
                     break;
 
@@ -96,7 +99,7 @@ public class Sender {
                 case timeout: /* trouble; retransmit all outstanding frames */
                     next_frame_to_send = ack_expected; /* start retransmitting here */
                     for (i = 1; i <= nbuffered; i++) {
-                        send_data(next_frame_to_send, frame_expected, buffer, obj_out_s); /* resend 1 frame */
+                        send_data(next_frame_to_send, frame_expected, buffer, obj_out_s, data_out_s); /* resend 1 frame */
                         next_frame_to_send = inc(next_frame_to_send); /* prepare to send the next one */
                     }
             }
@@ -126,8 +129,8 @@ public class Sender {
             return (false);
     }
 
-    static void send_data(int frame_nr, int frame_expected, Packet[] buffer, ObjectOutputStream oos)
-            throws IOException {
+    static void send_data(int frame_nr, int frame_expected, Packet[] buffer, ObjectOutputStream oos, DataOutputStream dos) throws IOException 
+    {
         /* Construct and send a data frame. */
         Frame s = null; /* scratch variable */
 
@@ -137,6 +140,9 @@ public class Sender {
         s.ack = (frame_expected + MAX_SEQ) % (MAX_SEQ + 1); /* piggyback ack */
         to_physical_layer(s, oos); /* transmit the frame */
         start_timer(frame_nr); /* start the timer running */
+
+        dos.writeUTF("Frame Sent"); // to indicate that the frame is sent
+        System.out.printf("Frame with seq %d is sent%n", frame_nr);
     }
 
     /* Wait for an event to happen; return its type in event. */
@@ -150,7 +156,7 @@ public class Sender {
 
             // break on frame arrival
             recieved_respond = dis.readUTF();
-            if (recieved_respond.equals("Frame Arrived")) {
+            if (recieved_respond.equals("Acknowledge Sent")) {
                 event = event_type.frame_arrival;
                 break;
             }
@@ -198,12 +204,13 @@ public class Sender {
     } // stop thread
 
     /* Fetch a packet from the network layer for transmission on the channel. */
-    static Packet from_network_layer() {
+    static Packet from_network_layer(DataOutputStream dos) throws IOException {
         network_index--;
         if (network_index + 1 >= 0)
             return network_buffer[network_index + 1];
         else {
             // write close close connection bye on outputstream
+            dos.writeUTF("Close connection. Bye!");
             event = event_type.NULL;
             return null;
         }
@@ -234,7 +241,7 @@ public class Sender {
 }
 
 class Timer implements Runnable {
-    private int frame_number;
+    // private int frame_number;
     private int max = 5;
     // Sender s = new Sender();
     event_type ee;
