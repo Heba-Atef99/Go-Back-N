@@ -2,10 +2,6 @@ import java.io.*;
 import java.net.*;
 // import java.util.concurrent.TimeUnit;
 
-enum event_type {
-    frame_arrival, cksum_err, timeout, network_layer_ready, NULL
-}
-
 public class Reciever {
     private class Packet {
         char[] data = new char[MAX_PKT];
@@ -53,18 +49,22 @@ public class Reciever {
             Socket s = s1.accept();
             DataOutputStream data_out_s = new DataOutputStream(s.getOutputStream());
             DataInputStream data_in_s = new DataInputStream(s.getInputStream());
-    
+
             ObjectOutputStream obj_out_s = new ObjectOutputStream(s.getOutputStream());
             ObjectInputStream obj_in_s = new ObjectInputStream(s.getInputStream());
-    
-            close_connection = wait_for_event(event, data_in_s, data_out_s); /* four possibilities: see event_type above */
+
+            close_connection = wait_for_event(event, data_in_s, data_out_s); /*
+                                                                              * four possibilities: see event_type above
+                                                                              */
 
             switch (event) {
                 case network_layer_ready: /* the network layer has a packet to send */
                     /* Accept, save, and transmit a new frame. */
                     // buffer[next_frame_to_send] = from_network_layer(); /* fetch new packet */
                     nbuffered = nbuffered + 1; /* expand the sender's window */
-                    send_data(next_frame_to_send, frame_expected, buffer, obj_out_s, data_out_s); /* transmit the frame */
+                    send_data(next_frame_to_send, frame_expected, buffer, obj_out_s, data_out_s); /*
+                                                                                                   * transmit the frame
+                                                                                                   */
                     next_frame_to_send = inc(next_frame_to_send); /* advance sender's upper window edge */
                     break;
 
@@ -92,7 +92,9 @@ public class Reciever {
                 case timeout: /* trouble; retransmit all outstanding frames */
                     next_frame_to_send = ack_expected; /* start retransmitting here */
                     for (i = 1; i <= nbuffered; i++) {
-                        send_data(next_frame_to_send, frame_expected, buffer, obj_out_s, data_out_s); /* resend 1 frame */
+                        send_data(next_frame_to_send, frame_expected, buffer, obj_out_s, data_out_s); /*
+                                                                                                       * resend 1 frame
+                                                                                                       */
                         next_frame_to_send = inc(next_frame_to_send); /* prepare to send the next one */
                     }
             }
@@ -102,8 +104,7 @@ public class Reciever {
             else
                 disable_network_layer();
 
-            if (close_connection)
-            {
+            if (close_connection) {
                 obj_in_s.close();
                 obj_out_s.close();
                 data_in_s.close();
@@ -125,13 +126,14 @@ public class Reciever {
             return (false);
     }
 
-    static void send_data(int frame_nr, int frame_expected, Packet[] buffer, ObjectOutputStream oos, DataOutputStream dos)
+    static void send_data(int frame_nr, int frame_expected, Packet[] buffer, ObjectOutputStream oos,
+            DataOutputStream dos)
             throws IOException {
         /* Construct and send a data frame. */
-        
+
         Frame s = null; /* scratch variable */
 
-        s.kind = frame_kind.ack; //will set it to ack in reciever code
+        s.kind = frame_kind.ack; // will set it to ack in reciever code
         s.info = buffer[frame_nr]; /* insert packet into frame */
         s.seq = frame_nr; /* insert sequence number into frame */
         s.ack = (frame_expected + MAX_SEQ) % (MAX_SEQ + 1); /* piggyback ack */
@@ -173,7 +175,6 @@ public class Reciever {
             f = (Frame) ois.readObject();
             System.out.printf("Ack %d ,, Data is %s", f.ack, f.info.data);
 
-
             if (f != null) {
                 break;
             }
@@ -189,29 +190,29 @@ public class Reciever {
 
     // /* Start the clock running and enable the timeout event. */
     // static void start_timer(int k) {
-    //     Timer timer = new Timer(event);
-    //     Thread thr = new Thread(timer);
-    //     thr_arr[k] = thr;
-    //     thr.start();
+    // Timer timer = new Timer(event);
+    // Thread thr = new Thread(timer);
+    // thr_arr[k] = thr;
+    // thr.start();
 
     // } // thread
 
     // /* Stop the clock and disable the timeout event. */
     // static void stop_timer(int k) {
-    //     thr_arr[k].interrupt();
+    // thr_arr[k].interrupt();
 
     // } // stop thread
 
     /* Fetch a packet from the network layer for transmission on the channel. */
     // static Packet from_network_layer() {
-    //     network_index--;
-    //     if (network_index + 1 >= 0)
-    //         return network_buffer[network_index + 1];
-    //     else {
-    //         // write close close connection bye on outputstream
-    //         event = event_type.NULL;
-    //         return null;
-    //     }
+    // network_index--;
+    // if (network_index + 1 >= 0)
+    // return network_buffer[network_index + 1];
+    // else {
+    // // write close close connection bye on outputstream
+    // event = event_type.NULL;
+    // return null;
+    // }
 
     // } // array
 
@@ -238,39 +239,45 @@ public class Reciever {
     }
 }
 
+enum event_type {
+    frame_arrival, cksum_err, timeout, network_layer_ready, NULL;
+
+    public static void main(String[] args) {
+    }
+}
 // class Timer implements Runnable {
-//     private int frame_number;
-//     private int max = 5;
-//     // Sender s = new Sender();
-//     event_type ee;
+// private int frame_number;
+// private int max = 5;
+// // Sender s = new Sender();
+// event_type ee;
 
-//     /*
-//      * enum event_type {
-//      * frame_arrival, cksum_err, timeout, network_layer_ready, NULL
-//      * }
-//      */
+// /*
+// * enum event_type {
+// * frame_arrival, cksum_err, timeout, network_layer_ready, NULL
+// * }
+// */
 
-//     public Timer(event_type e) {
-//         ee = e;
-//     }
+// public Timer(event_type e) {
+// ee = e;
+// }
 
-//     @Override
-//     public void run() {
-//         int i = 0;
-//         try {
-//             while (i <= max) {
+// @Override
+// public void run() {
+// int i = 0;
+// try {
+// while (i <= max) {
 
-//                 if (Thread.currentThread().isInterrupted())
-//                     break;
-//                 TimeUnit.SECONDS.sleep(1);
-//                 i++;
+// if (Thread.currentThread().isInterrupted())
+// break;
+// TimeUnit.SECONDS.sleep(1);
+// i++;
 
-//             }
-//             if (i > max)
-//                 ee = event_type.timeout;
+// }
+// if (i > max)
+// ee = event_type.timeout;
 
-//         } catch (InterruptedException e) {
-//             System.out.println(e.getMessage());
-//         }
-//     }
+// } catch (InterruptedException e) {
+// System.out.println(e.getMessage());
+// }
+// }
 // }
