@@ -37,7 +37,7 @@ public class Sender{
 
         while (true) {
             close_connection = wait_for_event(data_in_s); /* four possibilities: see event_type above */
-            System.out.printf("Sender Event: %s%n", event);
+            // System.out.printf("Sender Event: %s%n", event);
 
             switch (event) {
                 case network_layer_ready: /* the network layer has a packet to send */
@@ -65,8 +65,8 @@ public class Sender{
                         // stop_timer(ack_expected); /* frame arrived intact; stop timer */
                         ack_expected = inc(ack_expected); /* contract sender's window */
                     }
-                    data_out_s.writeUTF("Recieve Another");
-                    if(r.seq == MAX_SEQ - 1)
+                    // data_out_s.writeUTF("Recieve Another");
+                    if(r.ack == MAX_SEQ - 1)
                     {
                         close_connection = true;
                     }
@@ -82,19 +82,18 @@ public class Sender{
                         next_frame_to_send = inc(next_frame_to_send); /* prepare to send the next one */
                     }
             }
+            if (close_connection == true)
+                break;
 
             if (nbuffered < MAX_SEQ)
                 enable_network_layer();
             else
                 disable_network_layer();
-
-            if (close_connection)
-                break;
-
         }
 
         data_out_s.writeUTF("Close connection. Bye!");
         System.out.printf("Sender Close Connection%n");
+        System.out.printf("************************Done************************%n");
         data_in_s.close();
         data_out_s.close();
         s.close();
@@ -108,8 +107,7 @@ public class Sender{
             return (false);
     }
 
-    static void send_data(int frame_nr, int frame_expected, Packet[] buffer,
-            DataOutputStream dos) throws IOException {
+    static void send_data(int frame_nr, int frame_expected, Packet[] buffer, DataOutputStream dos) throws IOException {
         /* Construct and send a data frame. */
         Frame s = new Frame(); /* scratch variable */
         
@@ -120,6 +118,7 @@ public class Sender{
         to_physical_layer(s, dos); /* transmit the frame */
         // start_timer(frame_nr); /* start the timer running */
         System.out.printf("Frame with seq %d is sent .... data %c%n", frame_nr, s.info.data);
+        // dos.writeUTF("Recieve Another");
     }
     static void set_Network_Buffer()
     {
@@ -136,20 +135,17 @@ public class Sender{
         while (true) {
             // break on frame arrival
             recieved_respond = dis.readUTF();
-            
+
             if (recieved_respond.equals("Acknowledge Sent")) {
                 event = event_type.frame_arrival;
-                System.out.printf("respond %s%n", recieved_respond);
                 break;
             }
 
             else if (recieved_respond.equals("Recieve Another")) {
-                System.out.printf("respond %s%n", recieved_respond);
                 break;
             }
 
             else if (recieved_respond.equals("Close connection. Bye!")) {
-                System.out.printf("respond %s%n", recieved_respond);
                 return true;
             }
         }
@@ -163,9 +159,11 @@ public class Sender{
         while (true) {
             // break on frame arrival
             data = dis.readUTF();
+
             if(data.equals("Sending Ack"))
             {
                 f.ack = dis.readInt();
+                System.out.printf("Recieved Ack %d%n", f.ack);
                 f.kind = frame_kind.ack;
                 break;
             }
@@ -199,18 +197,12 @@ public class Sender{
     /* Fetch a packet from the network layer for transmission on the channel. */
     static Packet from_network_layer(DataOutputStream dos) throws IOException {
         network_index--;
-        System.out.printf("network index %d%n", network_index);
 
         if (network_index + 1 >= 0){
-            System.out.printf("network buff %s%n%n", network_buffer[network_index + 1]);
             Packet p = new Packet(network_buffer[network_index + 1]);
             return p;
         }
         else {
-            // write close close connection bye on outputstream
-            dos.writeUTF("Close connection. Bye!");
-            System.out.printf("Sender Close Connection%n");
-            event = event_type.NULL;
             return null;
         }
 

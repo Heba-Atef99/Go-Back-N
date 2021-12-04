@@ -4,8 +4,8 @@ import java.net.*;
 
 public class Reciever {
     // packer buffer of network layer // and buffer index
-    private static final Packet[] network_buffer = new Packet[20];
-    private static int network_index = 19;
+    private static final Packet[] network_buffer = new Packet[7];
+    private static int network_index = 6;
     // list of threads
     // private static List<Thread> thr_list =new ArrayList<Thread>();
     private static Thread[] thr_arr = new Thread[100];
@@ -34,24 +34,25 @@ public class Reciever {
         DataInputStream data_in_s = new DataInputStream(s.getInputStream());
 
         while (true) {
-            System.out.printf("Iam in%n");
 
+            //To start the connection via the socket
             if(i == 0)
                 data_out_s.writeUTF("Recieve Another");
 
             close_connection = wait_for_event(data_in_s, data_out_s); /** four possibilities: see event_type above*/
-            // System.out.printf("out%n");
-            System.out.printf("Reciever Event: %s%n", event);
+            // System.out.printf("Reciever Event: %s%n", event);
+            
+            if (close_connection) {
+                System.out.printf("Reciever Close Connection%n");
+                System.out.printf("************************Done************************%n");
+                data_in_s.close();
+                data_out_s.close();
+                s.close();
+                s1.close();
+                break;
+            }
 
             switch (event) {
-                case network_layer_ready: /* the network layer has a packet to send */
-                    /* Accept, save, and transmit a new frame. */
-                    // buffer[next_frame_to_send] = from_network_layer(); /* fetch new packet */
-                    nbuffered = nbuffered + 1; /* expand the sender's window */
-                    send_data(next_frame_to_send, frame_expected, buffer, data_out_s); /** transmit the frame*/
-                    next_frame_to_send = inc(next_frame_to_send); /* advance sender's upper window edge */
-                    break;
-
                 case frame_arrival: /* a data or control frame has arrived */
                     r = from_physical_layer(data_in_s); /* get incoming frame from physical layer */
 
@@ -68,7 +69,10 @@ public class Reciever {
                         // stop_timer(ack_expected); /* frame arrived intact; stop timer */
                         ack_expected = inc(ack_expected); /* contract sender's window */
                     }
-                    // data_out_s.writeUTF("Recieve Another");
+                    
+                    nbuffered = nbuffered + 1; /* expand the sender's window */
+                    send_data(next_frame_to_send, frame_expected, buffer, data_out_s); /** transmit the frame*/
+                    next_frame_to_send = inc(next_frame_to_send); /* advance sender's upper window edge */
                     break;
 
                 case cksum_err: /* just ignore bad frames */
@@ -86,15 +90,6 @@ public class Reciever {
                 enable_network_layer();
             else
                 disable_network_layer();
-
-            if (close_connection) {
-                data_in_s.close();
-                data_out_s.close();
-                s.close();
-                s1.close();
-                break;
-            }
-
         }
 
     }
@@ -114,7 +109,6 @@ public class Reciever {
         Frame s = new Frame(); /* scratch variable */
 
         s.kind = frame_kind.ack; // will set it to ack in reciever code
-        // s.info = buffer[frame_nr]; /* insert packet into frame */
         s.seq = frame_nr; /* insert sequence number into frame */
         s.ack = (frame_expected + MAX_SEQ) % (MAX_SEQ + 1); /* piggyback ack */
         dos.writeUTF("Acknowledge Sent"); // to indicate that the frame is sent
@@ -128,35 +122,26 @@ public class Reciever {
     static boolean wait_for_event(DataInputStream dis, DataOutputStream dos) throws IOException {
         String recieved_respond = null;
         while (true) {
-            System.out.printf("Waiting for event%n");
             // break on frame arrival
             recieved_respond = dis.readUTF();
             if (recieved_respond.equals("Frame Sent")) {
                 event = event_type.frame_arrival;
-                System.out.printf("1");
                 break;
             }
             
             else if (recieved_respond.equals("Recieve Another")) {
-                System.out.printf("2");
                 break;
             }
 
             else if (recieved_respond.equals("Close connection. Bye!")) {
-                System.out.printf("3");
-                dos.writeUTF("Close connection. Bye!");
                 return true;
-            }
-            else
-            {
-                System.out.printf("rec %s%n", recieved_respond);
             }
         }
         return false;
     } ////////////// pass event & datainput stream
 
     /* Go get an inbound frame from the physical layer and copy it to r. */
-    static Frame from_physical_layer(DataInputStream dis) throws IOException, ClassNotFoundException {
+    static Frame from_physical_layer(DataInputStream dis) throws IOException{
         Frame f = new Frame();
         String data;
         while (true) {
@@ -189,6 +174,7 @@ public class Reciever {
 
     /* Allow the network layer to cause a network_layer_ready event. */
     static void enable_network_layer() {
+        System.out.printf("Reciever Enable Network%n");
         event = event_type.network_layer_ready;
     } // change the event
 
