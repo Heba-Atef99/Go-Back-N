@@ -68,7 +68,7 @@ public class Reciever {
                         // stop_timer(ack_expected); /* frame arrived intact; stop timer */
                         ack_expected = inc(ack_expected); /* contract sender's window */
                     }
-                    data_out_s.writeUTF("Recieve Another");
+                    // data_out_s.writeUTF("Recieve Another");
                     break;
 
                 case cksum_err: /* just ignore bad frames */
@@ -117,8 +117,8 @@ public class Reciever {
         // s.info = buffer[frame_nr]; /* insert packet into frame */
         s.seq = frame_nr; /* insert sequence number into frame */
         s.ack = (frame_expected + MAX_SEQ) % (MAX_SEQ + 1); /* piggyback ack */
-        to_physical_layer(s, dos); /* transmit the frame */
         dos.writeUTF("Acknowledge Sent"); // to indicate that the frame is sent
+        to_physical_layer(s, dos); /* transmit the frame */
         System.out.printf("Frame with Ack %d is sent%n", s.ack);
 
         // start_timer(frame_nr); /* start the timer running */
@@ -131,11 +131,9 @@ public class Reciever {
             System.out.printf("Waiting for event%n");
             // break on frame arrival
             recieved_respond = dis.readUTF();
-            // recieved_respond = "Frame Sent";
             if (recieved_respond.equals("Frame Sent")) {
                 event = event_type.frame_arrival;
                 System.out.printf("1");
-
                 break;
             }
             
@@ -163,13 +161,15 @@ public class Reciever {
         String data;
         while (true) {
             // break on frame arrival
-            f.seq = dis.readInt();
-            f.info.data = dis.readChar();
-
-            System.out.printf("Seq %i ,, Data %s%n", f.seq, f.info.data);
-
-            if (f.seq != 0) {
-                break;
+            data = dis.readUTF();
+            if(data.equals("Sending Frame"))
+            {
+                f.seq = dis.readInt();
+                f.info.data = dis.readChar();
+    
+                System.out.printf("Seq %d", f.seq); 
+                System.out.printf(" ,, Data %c%n", f.info.data); 
+                break;   
             }
         }
 
@@ -178,6 +178,7 @@ public class Reciever {
 
     /* Pass the frame to the physical layer for transmission. */
     static void to_physical_layer(Frame f, DataOutputStream dos) throws IOException {
+        dos.writeUTF("Sending Ack");
         dos.writeInt(f.ack);
     }// socket
 

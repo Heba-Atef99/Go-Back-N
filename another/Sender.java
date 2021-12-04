@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit;
 
 public class Sender{
     // packer buffer of network layer // and buffer index
-    private static Packet[] network_buffer = new Packet[7];
+    private static char[] network_buffer = new char[7];
     private static int network_index = 6;
     // list of threads
     // private static List<Thread> thr_list =new ArrayList<Thread>();
@@ -66,6 +66,10 @@ public class Sender{
                         ack_expected = inc(ack_expected); /* contract sender's window */
                     }
                     data_out_s.writeUTF("Recieve Another");
+                    if(r.seq == MAX_SEQ - 1)
+                    {
+                        close_connection = true;
+                    }
                     break;
 
                 case cksum_err: /* just ignore bad frames */
@@ -89,6 +93,8 @@ public class Sender{
 
         }
 
+        data_out_s.writeUTF("Close connection. Bye!");
+        System.out.printf("Sender Close Connection%n");
         data_in_s.close();
         data_out_s.close();
         s.close();
@@ -110,19 +116,18 @@ public class Sender{
         s.info = buffer[frame_nr]; /* insert packet into frame */
         s.seq = frame_nr; /* insert sequence number into frame */
         s.ack = (frame_expected + MAX_SEQ) % (MAX_SEQ + 1); /* piggyback ack */
+        dos.writeUTF("Frame Sent"); // to indicate that the frame is sent
         to_physical_layer(s, dos); /* transmit the frame */
         // start_timer(frame_nr); /* start the timer running */
-
-        dos.writeUTF("Frame Sent"); // to indicate that the frame is sent
-        System.out.printf("Frame with seq %d is sent%n", frame_nr);
+        System.out.printf("Frame with seq %d is sent .... data %c%n", frame_nr, s.info.data);
     }
     static void set_Network_Buffer()
     {
         char[] alpha = { 'A', 'B', 'C', 'D', 'E', 'F', 'G' };
         for (int j = 0; j < 7; j++) {
-            Packet p = new Packet(alpha[j]);
-            network_buffer[j] = p;
+            network_buffer[j] = alpha[j];
         }
+
     }
 
     /* Wait for an event to happen; return its type in event. */
@@ -131,16 +136,20 @@ public class Sender{
         while (true) {
             // break on frame arrival
             recieved_respond = dis.readUTF();
+            
             if (recieved_respond.equals("Acknowledge Sent")) {
                 event = event_type.frame_arrival;
+                System.out.printf("respond %s%n", recieved_respond);
                 break;
             }
 
             else if (recieved_respond.equals("Recieve Another")) {
+                System.out.printf("respond %s%n", recieved_respond);
                 break;
             }
 
             else if (recieved_respond.equals("Close connection. Bye!")) {
+                System.out.printf("respond %s%n", recieved_respond);
                 return true;
             }
         }
@@ -150,12 +159,14 @@ public class Sender{
     /* Go get an inbound frame from the physical layer and copy it to r. */
     static Frame from_physical_layer(DataInputStream dis) throws IOException, ClassNotFoundException {
         Frame f = new Frame();
+        String data; 
         while (true) {
             // break on frame arrival
-            f.ack = dis.readInt();
-            f.kind = frame_kind.ack;
-            
-            if (f.ack != 0) {
+            data = dis.readUTF();
+            if(data.equals("Sending Ack"))
+            {
+                f.ack = dis.readInt();
+                f.kind = frame_kind.ack;
                 break;
             }
         }
@@ -165,6 +176,7 @@ public class Sender{
 
     /* Pass the frame to the physical layer for transmission. */
     static void to_physical_layer(Frame f, DataOutputStream dos) throws IOException {
+        dos.writeUTF("Sending Frame");
         dos.writeInt(f.seq);
         dos.writeChar(f.info.data);
     }// socket
@@ -187,8 +199,13 @@ public class Sender{
     /* Fetch a packet from the network layer for transmission on the channel. */
     static Packet from_network_layer(DataOutputStream dos) throws IOException {
         network_index--;
-        if (network_index + 1 >= 0)
-            return network_buffer[network_index + 1];
+        System.out.printf("network index %d%n", network_index);
+
+        if (network_index + 1 >= 0){
+            System.out.printf("network buff %s%n%n", network_buffer[network_index + 1]);
+            Packet p = new Packet(network_buffer[network_index + 1]);
+            return p;
+        }
         else {
             // write close close connection bye on outputstream
             dos.writeUTF("Close connection. Bye!");
@@ -261,7 +278,7 @@ enum event_type {
     }
 }
 
-class Packet implements Serializable{
+class Packet{
     public static char data;
     public Packet(char d) {
         data = d;
@@ -272,7 +289,7 @@ enum frame_kind {
     data, ack, nak
 }
 
-class Frame implements Serializable{
+class Frame{
     frame_kind kind;
     int seq = 0;
     int ack = 0;
