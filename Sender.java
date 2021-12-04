@@ -2,22 +2,7 @@ import java.io.*;
 import java.net.*;
 import java.util.concurrent.TimeUnit;
 
-public class Sender {
-    private class Packet {
-        public static char data;
-    }
-
-    enum frame_kind {
-        data, ack, nak
-    }
-
-    private class Frame {
-        frame_kind kind;
-        int seq;
-        int ack;
-        Packet info;
-    }
-
+public class Sender{
     // packer buffer of network layer // and buffer index
     private static Packet[] network_buffer = new Packet[7];
     private static int network_index = 6;
@@ -31,12 +16,7 @@ public class Sender {
     // private static Packet p = new Packet();
 
     public static void main(String[] args) throws IOException, ClassNotFoundException {
-        char[] alpha = { 'A', 'B', 'C', 'D', 'E', 'F', 'G' };
-        for (int j = 0; j < 7; j++) {
-            Packet p = null;
-            p.data = alpha[j];
-            network_buffer[j] = p;
-        }
+        set_Network_Buffer();
 
         Socket s = new Socket("127.0.0.1", 1234);
         String recieved_respond = null;
@@ -60,6 +40,8 @@ public class Sender {
 
         while (true) {
             close_connection = wait_for_event(data_in_s); /* four possibilities: see event_type above */
+            System.out.printf("Sender Event: %s", event);
+            System.out.println("lalala");
 
             switch (event) {
                 case network_layer_ready: /* the network layer has a packet to send */
@@ -68,6 +50,7 @@ public class Sender {
                     nbuffered = nbuffered + 1; /* expand the sender's window */
                     send_data(next_frame_to_send, frame_expected, buffer, obj_out_s, data_out_s); /* transmit the frame*/
                     next_frame_to_send = inc(next_frame_to_send); /* advance sender's upper window edge */
+                    // data_out_s.writeUTF("Recieve Another");
                     break;
 
                 case frame_arrival: /* a data or control frame has arrived */
@@ -128,8 +111,9 @@ public class Sender {
     static void send_data(int frame_nr, int frame_expected, Packet[] buffer, ObjectOutputStream oos,
             DataOutputStream dos) throws IOException {
         /* Construct and send a data frame. */
-        Frame s = null; /* scratch variable */
-
+        Frame s = new Frame(); /* scratch variable */
+        // System.out.printf("NetBuffer %c", buffer[0].data);
+        
         // s.kind = data; //will set it to ack in reciever code
         s.info = buffer[frame_nr]; /* insert packet into frame */
         s.seq = frame_nr; /* insert sequence number into frame */
@@ -139,6 +123,16 @@ public class Sender {
 
         dos.writeUTF("Frame Sent"); // to indicate that the frame is sent
         System.out.printf("Frame with seq %d is sent%n", frame_nr);
+    }
+    static void set_Network_Buffer()
+    {
+        char[] alpha = { 'A', 'B', 'C', 'D', 'E', 'F', 'G' };
+        for (int j = 0; j < 7; j++) {
+            Packet p = new Packet(alpha[j]);
+            // p.data = ;
+            network_buffer[j] = p;
+            // System.out.printf("NetBuffer %c", p.data);
+        }
     }
 
     /* Wait for an event to happen; return its type in event. */
@@ -165,7 +159,7 @@ public class Sender {
 
     /* Go get an inbound frame from the physical layer and copy it to r. */
     static Frame from_physical_layer(ObjectInputStream ois) throws IOException, ClassNotFoundException {
-        Frame f = null;
+        Frame f = new Frame();
         while (true) {
             // break on frame arrival
             f = (Frame) ois.readObject();
@@ -206,6 +200,7 @@ public class Sender {
         else {
             // write close close connection bye on outputstream
             dos.writeUTF("Close connection. Bye!");
+            System.out.printf("Sender Close Connection");
             event = event_type.NULL;
             return null;
         }
@@ -220,13 +215,16 @@ public class Sender {
     /* Allow the network layer to cause a network_layer_ready event. */
     static void enable_network_layer() {
         event = event_type.network_layer_ready;
+        System.out.printf("Sender Enable Network");
 
     } // change the event
 
     /* Forbid the network layer from causing a network_layer_ready event. */
     static void disable_network_layer() {
-        if (event == event_type.network_layer_ready)
-            event = event_type.NULL;
+        if (event == event_type.network_layer_ready){
+                event = event_type.NULL;
+                System.out.printf("Sender Disable Network");
+        }
     }
 
     static int inc(int k) {
@@ -278,3 +276,22 @@ enum event_type {
     public static void main(String[] args) {
     }
 }
+
+class Packet implements Serializable{
+    public static char data;
+    public Packet(char d) {
+        data = d;
+    }
+}
+
+enum frame_kind {
+    data, ack, nak
+}
+
+class Frame implements Serializable{
+    frame_kind kind;
+    int seq;
+    int ack;
+    Packet info;
+}
+
