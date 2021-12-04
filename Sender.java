@@ -59,16 +59,14 @@ public class Sender {
         enable_network_layer(); /* allow network_layer_ready events */
 
         while (true) {
-            close_connection = wait_for_event(event, data_in_s); /* four possibilities: see event_type above */
+            close_connection = wait_for_event(data_in_s); /* four possibilities: see event_type above */
 
             switch (event) {
                 case network_layer_ready: /* the network layer has a packet to send */
                     /* Accept, save, and transmit a new frame. */
                     buffer[next_frame_to_send] = from_network_layer(data_out_s); /* fetch new packet */
                     nbuffered = nbuffered + 1; /* expand the sender's window */
-                    send_data(next_frame_to_send, frame_expected, buffer, obj_out_s, data_out_s); /*
-                                                                                                   * transmit the frame
-                                                                                                   */
+                    send_data(next_frame_to_send, frame_expected, buffer, obj_out_s, data_out_s); /* transmit the frame*/
                     next_frame_to_send = inc(next_frame_to_send); /* advance sender's upper window edge */
                     break;
 
@@ -88,6 +86,7 @@ public class Sender {
                         stop_timer(ack_expected); /* frame arrived intact; stop timer */
                         ack_expected = inc(ack_expected); /* contract sender's window */
                     }
+                    data_out_s.writeUTF("Recieve Another");
                     break;
 
                 case cksum_err: /* just ignore bad frames */
@@ -96,9 +95,7 @@ public class Sender {
                 case timeout: /* trouble; retransmit all outstanding frames */
                     next_frame_to_send = ack_expected; /* start retransmitting here */
                     for (i = 1; i <= nbuffered; i++) {
-                        send_data(next_frame_to_send, frame_expected, buffer, obj_out_s, data_out_s); /*
-                                                                                                       * resend 1 frame
-                                                                                                       */
+                        send_data(next_frame_to_send, frame_expected, buffer, obj_out_s, data_out_s); /* resend 1 frame*/
                         next_frame_to_send = inc(next_frame_to_send); /* prepare to send the next one */
                     }
             }
@@ -145,18 +142,17 @@ public class Sender {
     }
 
     /* Wait for an event to happen; return its type in event. */
-    static boolean wait_for_event(event_type t, DataInputStream dis) throws IOException {
+    static boolean wait_for_event(DataInputStream dis) throws IOException {
         String recieved_respond = null;
         while (true) {
-            // break on the change of event variable
-            if (t != event) {
-                break;
-            }
-
             // break on frame arrival
             recieved_respond = dis.readUTF();
             if (recieved_respond.equals("Acknowledge Sent")) {
                 event = event_type.frame_arrival;
+                break;
+            }
+
+            else if (recieved_respond.equals("Recieve Another")) {
                 break;
             }
 

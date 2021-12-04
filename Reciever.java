@@ -53,7 +53,7 @@ public class Reciever {
             ObjectOutputStream obj_out_s = new ObjectOutputStream(s.getOutputStream());
             ObjectInputStream obj_in_s = new ObjectInputStream(s.getInputStream());
 
-            close_connection = wait_for_event(event, data_in_s, data_out_s); /*
+            close_connection = wait_for_event(data_in_s, data_out_s); /*
                                                                               * four possibilities: see event_type above
                                                                               */
 
@@ -84,6 +84,7 @@ public class Reciever {
                         // stop_timer(ack_expected); /* frame arrived intact; stop timer */
                         ack_expected = inc(ack_expected); /* contract sender's window */
                     }
+                    data_out_s.writeUTF("Recieve Another");
                     break;
 
                 case cksum_err: /* just ignore bad frames */
@@ -144,18 +145,17 @@ public class Reciever {
     }
 
     /* Wait for an event to happen; return its type in event. */
-    static boolean wait_for_event(event_type t, DataInputStream dis, DataOutputStream dos) throws IOException {
+    static boolean wait_for_event(DataInputStream dis, DataOutputStream dos) throws IOException {
         String recieved_respond = null;
         while (true) {
-            // break on the change of event variable
-            if (t != event) {
-                break;
-            }
-
             // break on frame arrival
             recieved_respond = dis.readUTF();
             if (recieved_respond.equals("Frame Sent")) {
                 event = event_type.frame_arrival;
+                break;
+            }
+
+            else if (recieved_respond.equals("Recieve Another")) {
                 break;
             }
 
