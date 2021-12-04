@@ -25,9 +25,6 @@ public class Sender{
         DataOutputStream data_out_s = new DataOutputStream(s.getOutputStream());
         DataInputStream data_in_s = new DataInputStream(s.getInputStream());
 
-        // ObjectOutputStream obj_out_s = new ObjectOutputStream(s.getOutputStream());
-        // ObjectInputStream obj_in_s = new ObjectInputStream(s.getInputStream());
-
         int next_frame_to_send = 0; /* MAX_SEQ > 1; used for outbound stream */
         int ack_expected = 0; /* oldest frame as yet unacknowledged */
         int frame_expected = 0; /* next frame expected on inbound stream */
@@ -92,8 +89,6 @@ public class Sender{
 
         }
 
-        obj_in_s.close();
-        obj_out_s.close();
         data_in_s.close();
         data_out_s.close();
         s.close();
@@ -107,7 +102,7 @@ public class Sender{
             return (false);
     }
 
-    static void send_data(int frame_nr, int frame_expected, Packet[] buffer, ObjectOutputStream oos,
+    static void send_data(int frame_nr, int frame_expected, Packet[] buffer,
             DataOutputStream dos) throws IOException {
         /* Construct and send a data frame. */
         Frame s = new Frame(); /* scratch variable */
@@ -115,7 +110,7 @@ public class Sender{
         s.info = buffer[frame_nr]; /* insert packet into frame */
         s.seq = frame_nr; /* insert sequence number into frame */
         s.ack = (frame_expected + MAX_SEQ) % (MAX_SEQ + 1); /* piggyback ack */
-        to_physical_layer(s, oos); /* transmit the frame */
+        to_physical_layer(s, dos); /* transmit the frame */
         // start_timer(frame_nr); /* start the timer running */
 
         dos.writeUTF("Frame Sent"); // to indicate that the frame is sent
@@ -153,13 +148,14 @@ public class Sender{
     } ////////////// pass event & datainput stream
 
     /* Go get an inbound frame from the physical layer and copy it to r. */
-    static Frame from_physical_layer(ObjectInputStream ois) throws IOException, ClassNotFoundException {
+    static Frame from_physical_layer(DataInputStream dis) throws IOException, ClassNotFoundException {
         Frame f = new Frame();
         while (true) {
             // break on frame arrival
-            f = (Frame) ois.readObject();
-
-            if (f != null) {
+            f.ack = dis.readInt();
+            f.kind = frame_kind.ack;
+            
+            if (f.ack != 0) {
                 break;
             }
         }
@@ -168,8 +164,9 @@ public class Sender{
     } // socket
 
     /* Pass the frame to the physical layer for transmission. */
-    static void to_physical_layer(Frame f, ObjectOutputStream oos) throws IOException {
-        oos.writeObject(f);
+    static void to_physical_layer(Frame f, DataOutputStream dos) throws IOException {
+        dos.writeInt(f.seq);
+        dos.writeChar(f.info.data);
     }// socket
 
     /* Start the clock running and enable the timeout event. */
@@ -277,8 +274,8 @@ enum frame_kind {
 
 class Frame implements Serializable{
     frame_kind kind;
-    int seq;
-    int ack;
+    int seq = 0;
+    int ack = 0;
     Packet info;
 }
 

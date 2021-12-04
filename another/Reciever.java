@@ -33,33 +33,27 @@ public class Reciever {
         DataOutputStream data_out_s = new DataOutputStream(s.getOutputStream());
         DataInputStream data_in_s = new DataInputStream(s.getInputStream());
 
-        ObjectOutputStream obj_out_s = new ObjectOutputStream(s.getOutputStream());
-        ObjectInputStream obj_in_s = new ObjectInputStream(s.getInputStream());
-
         while (true) {
             System.out.printf("Iam in%n");
 
             if(i == 0)
                 data_out_s.writeUTF("Recieve Another");
 
-            close_connection = wait_for_event(data_in_s, data_out_s); /*
-                                                                              * four possibilities: see event_type above
-                                                                              */
-            System.out.printf("out");
+            close_connection = wait_for_event(data_in_s, data_out_s); /** four possibilities: see event_type above*/
+            // System.out.printf("out%n");
+            System.out.printf("Reciever Event: %s%n", event);
 
             switch (event) {
                 case network_layer_ready: /* the network layer has a packet to send */
                     /* Accept, save, and transmit a new frame. */
                     // buffer[next_frame_to_send] = from_network_layer(); /* fetch new packet */
                     nbuffered = nbuffered + 1; /* expand the sender's window */
-                    send_data(next_frame_to_send, frame_expected, buffer, obj_out_s, data_out_s); /*
-                                                                                                   * transmit the frame
-                                                                                                   */
+                    send_data(next_frame_to_send, frame_expected, buffer, data_out_s); /** transmit the frame*/
                     next_frame_to_send = inc(next_frame_to_send); /* advance sender's upper window edge */
                     break;
 
                 case frame_arrival: /* a data or control frame has arrived */
-                    r = from_physical_layer(obj_in_s); /* get incoming frame from physical layer */
+                    r = from_physical_layer(data_in_s); /* get incoming frame from physical layer */
 
                     if (r.seq == frame_expected) {
                         /* Frames are accepted only in order. */
@@ -83,9 +77,7 @@ public class Reciever {
                 case timeout: /* trouble; retransmit all outstanding frames */
                     next_frame_to_send = ack_expected; /* start retransmitting here */
                     for (i = 1; i <= nbuffered; i++) {
-                        send_data(next_frame_to_send, frame_expected, buffer, obj_out_s, data_out_s); /*
-                                                                                                       * resend 1 frame
-                                                                                                       */
+                        send_data(next_frame_to_send, frame_expected, buffer, data_out_s); /** resend 1 frame*/
                         next_frame_to_send = inc(next_frame_to_send); /* prepare to send the next one */
                     }
             }
@@ -96,8 +88,6 @@ public class Reciever {
                 disable_network_layer();
 
             if (close_connection) {
-                obj_in_s.close();
-                obj_out_s.close();
                 data_in_s.close();
                 data_out_s.close();
                 s.close();
@@ -117,8 +107,7 @@ public class Reciever {
             return (false);
     }
 
-    static void send_data(int frame_nr, int frame_expected, Packet[] buffer, ObjectOutputStream oos,
-            DataOutputStream dos)
+    static void send_data(int frame_nr, int frame_expected, Packet[] buffer, DataOutputStream dos)
             throws IOException {
         /* Construct and send a data frame. */
 
@@ -128,8 +117,9 @@ public class Reciever {
         // s.info = buffer[frame_nr]; /* insert packet into frame */
         s.seq = frame_nr; /* insert sequence number into frame */
         s.ack = (frame_expected + MAX_SEQ) % (MAX_SEQ + 1); /* piggyback ack */
-        to_physical_layer(s, oos); /* transmit the frame */
+        to_physical_layer(s, dos); /* transmit the frame */
         dos.writeUTF("Acknowledge Sent"); // to indicate that the frame is sent
+        System.out.printf("Frame with Ack %d is sent%n", s.ack);
 
         // start_timer(frame_nr); /* start the timer running */
     }
@@ -138,11 +128,10 @@ public class Reciever {
     static boolean wait_for_event(DataInputStream dis, DataOutputStream dos) throws IOException {
         String recieved_respond = null;
         while (true) {
-            System.out.printf("Waiting for event");
+            System.out.printf("Waiting for event%n");
             // break on frame arrival
-            // recieved_respond = dis.readUTF();
-            recieved_respond = "Frame Sent";
-            // System.out.printf("Waiting for evemt");
+            recieved_respond = dis.readUTF();
+            // recieved_respond = "Frame Sent";
             if (recieved_respond.equals("Frame Sent")) {
                 event = event_type.frame_arrival;
                 System.out.printf("1");
@@ -160,19 +149,26 @@ public class Reciever {
                 dos.writeUTF("Close connection. Bye!");
                 return true;
             }
+            else
+            {
+                System.out.printf("rec %s%n", recieved_respond);
+            }
         }
         return false;
     } ////////////// pass event & datainput stream
 
     /* Go get an inbound frame from the physical layer and copy it to r. */
-    static Frame from_physical_layer(ObjectInputStream ois) throws IOException, ClassNotFoundException {
+    static Frame from_physical_layer(DataInputStream dis) throws IOException, ClassNotFoundException {
         Frame f = new Frame();
+        String data;
         while (true) {
             // break on frame arrival
-            f = (Frame) ois.readObject();
-            System.out.printf("Ack %d ,, Data is %c%n", f.ack, f.info.data);
+            f.seq = dis.readInt();
+            f.info.data = dis.readChar();
 
-            if (f != null) {
+            System.out.printf("Seq %i ,, Data %s%n", f.seq, f.info.data);
+
+            if (f.seq != 0) {
                 break;
             }
         }
@@ -181,37 +177,9 @@ public class Reciever {
     } // socket
 
     /* Pass the frame to the physical layer for transmission. */
-    static void to_physical_layer(Frame f, ObjectOutputStream oos) throws IOException {
-        oos.writeObject(f);
+    static void to_physical_layer(Frame f, DataOutputStream dos) throws IOException {
+        dos.writeInt(f.ack);
     }// socket
-
-    // /* Start the clock running and enable the timeout event. */
-    // static void start_timer(int k) {
-    // Timer timer = new Timer(event);
-    // Thread thr = new Thread(timer);
-    // thr_arr[k] = thr;
-    // thr.start();
-
-    // } // thread
-
-    // /* Stop the clock and disable the timeout event. */
-    // static void stop_timer(int k) {
-    // thr_arr[k].interrupt();
-
-    // } // stop thread
-
-    /* Fetch a packet from the network layer for transmission on the channel. */
-    // static Packet from_network_layer() {
-    // network_index--;
-    // if (network_index + 1 >= 0)
-    // return network_buffer[network_index + 1];
-    // else {
-    // // write close close connection bye on outputstream
-    // event = event_type.NULL;
-    // return null;
-    // }
-
-    // } // array
 
     /* Deliver information from an inbound frame to the network layer. */
     static void to_network_layer(Packet p) {
@@ -221,8 +189,6 @@ public class Reciever {
     /* Allow the network layer to cause a network_layer_ready event. */
     static void enable_network_layer() {
         event = event_type.network_layer_ready;
-
-
     } // change the event
 
     /* Forbid the network layer from causing a network_layer_ready event. */
@@ -257,44 +223,7 @@ enum frame_kind {
 
 class Frame implements Serializable {
     frame_kind kind;
-    int seq;
-    int ack;
+    int seq = 0;
+    int ack = 0;
     Packet info;
 }
-
-// class Timer implements Runnable {
-// private int frame_number;
-// private int max = 5;
-// // Sender s = new Sender();
-// event_type ee;
-
-// /*
-// * enum event_type {
-// * frame_arrival, cksum_err, timeout, network_layer_ready, NULL
-// * }
-// */
-
-// public Timer(event_type e) {
-// ee = e;
-// }
-
-// @Override
-// public void run() {
-// int i = 0;
-// try {
-// while (i <= max) {
-
-// if (Thread.currentThread().isInterrupted())
-// break;
-// TimeUnit.SECONDS.sleep(1);
-// i++;
-
-// }
-// if (i > max)
-// ee = event_type.timeout;
-
-// } catch (InterruptedException e) {
-// System.out.println(e.getMessage());
-// }
-// }
-// }
