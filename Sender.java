@@ -44,17 +44,9 @@ public class Sender {
                     /* Accept, save, and transmit a new frame. */
                     buffer[next_frame_to_send] = from_network_layer(data_out_s); /* fetch new packet */
                     nbuffered = nbuffered + 1; /* expand the sender's window */
-                    if (network_index + 1 == 5) {
-                        next_frame_to_send = inc(next_frame_to_send); /*
-                                                                       * advance sender's upper
-                                                                       * window edge
-                                                                       */
-                        data_out_s.writeUTF("Frame not sent");
-
-                    } else {
-                        send_data(next_frame_to_send, frame_expected, buffer, data_out_s); /* transmit the frame */
-                        next_frame_to_send = inc(next_frame_to_send);
-                        /* advance sender's upper window edge */ }
+                    send_data(next_frame_to_send, frame_expected, buffer, data_out_s); /* transmit the frame */
+                    next_frame_to_send = inc(next_frame_to_send);
+                    /* advance sender's upper window edge */
 
                     // data_out_s.writeUTF("Recieve Another");
                     break;
@@ -97,7 +89,7 @@ public class Sender {
                     System.out.println("Timeout event ");
 
             }
-            if (close_connection == true & (nbuffered == 0))
+            if (close_connection == true)
                 break;
 
             if (nbuffered < MAX_SEQ)
